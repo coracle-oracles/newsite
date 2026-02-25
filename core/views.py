@@ -40,10 +40,6 @@ def principles(request):
     return render(request, 'core/principles.html')
 
 
-def ticket_info(request):
-    return render(request, 'core/ticket_info.html')
-
-
 @login_required
 def tickets(request):
     """Display ticket selection page."""

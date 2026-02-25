@@ -38,19 +38,11 @@
                                 </button>
                                 <ul class="dropdown-menu">
                                     <li><a class="dropdown-item" href="{% url 'tickets' %}">Buy Tickets</a></li>
-                                    <li><a class="dropdown-item" href="{% url 'ticket_info' %}">Ticket Info</a></li>
                                     <li><a class="dropdown-item" href="https://forms.zohopublic.com/geodesictravelercooperative/form/Coracle2025ScholarshipTicketApplication/formperma/Y2DLu_nGR-IlLNtPlig_YKGoj01MNsj88wdolv8qmGM">Scholarship Application</a></li>
                                     <li><a target="_blank" class="dropdown-item" href="{% static 'doc/waiver.pdf' %}">Waiver</a></li>
-                                </ul>
-                            </div>
-                        </li>
-                        <li class="nav-item">
-                            <div class="dropdown">
-                                <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    Art Grants Donation
-                                </button>
-                                <ul class="dropdown-menu">
-                                    <li><a target="_blank" class="dropdown-item" href="https://buy.stripe.com/6oE7sy61r5zP1NK4gn">Art grant donation</a></li>
+                                    <ul class="dropdown-menu">
+                                        <li><a target="_blank" class="dropdown-item" href="https://buy.stripe.com/6oE7sy61r5zP1NK4gn">Art grant donation</a></li>
+                                    </ul>
                                 </ul>
                             </div>
                         </li>
@@ -100,7 +92,7 @@
                         <li class="nav-item">
                             <div class="dropdown">
                                 <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    {{ user.name|default:user.email }}
+                                    My Account
                                 </button>
                                 <ul class="dropdown-menu">
                                     <li><a class="dropdown-item" href="{% url 'my_tickets' %}">My Tickets</a></li>

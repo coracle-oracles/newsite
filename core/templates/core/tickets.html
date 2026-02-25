@@ -10,6 +10,18 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-10">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Ticket Information</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Ticket sales begin on June 29, 2025.</strong></p>
+                <p>Coracle is a sanctioned Burning Man regional event. Burning Man Project is not a producer or organizer of Coracle, and Burning Man Project accepts no liability arising out of or in connection with Coracle.</p>
+                <p>We strive to make Coracle a safe and beautiful experience for every participant. It is your responsibility to make sure you are not on any other regional's ban list. You will be denied entry and you will not get a refund.</p>
+                <p>Coracle is open to participants of all ages. Children 12 and under are free. You will be asked to register your child at the gate, and we will also send this registration out before Coracle.</p>
+            </div>
+        </div>
+
         <form method="post" action="{% url 'create_checkout_session' %}" id="ticket-form">
             {% csrf_token %}
 
