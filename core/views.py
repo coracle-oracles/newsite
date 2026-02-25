@@ -1,16 +1,21 @@
+import base64
+import io
+from urllib.parse import quote
+
+import qrcode
 import stripe
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.conf import settings
-from django.http import JsonResponse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from django.db.models import Count
 
 from .forms import CustomUserCreationForm
-from .models import Event, Order, TicketType, Transfer, User, Role, Shift, ShiftAssignment
+from .models import Event, Order, Transfer, User, Role, Shift, ShiftAssignment
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -196,11 +201,21 @@ def my_tickets(request):
         status='pending',
     ).select_related('order__ticket_type', 'from_user') if event else Transfer.objects.none()
 
+    # Generate QR code with user's email if they have tickets
+    qr_code_data_url = None
+    if owned_tickets.exists():
+        qr = qrcode.make(request.build_absolute_uri('/checkin?email=' + quote(request.user.email)))
+        buffer = io.BytesIO()
+        qr.save(buffer, format='PNG')
+        qr_base64 = base64.b64encode(buffer.getvalue()).decode()
+        qr_code_data_url = f"data:image/png;base64,{qr_base64}"
+
     return render(request, 'core/my_tickets.html', {
         'event': event,
         'owned_tickets': owned_tickets,
         'outgoing_transfers': outgoing_transfers,
         'incoming_transfers': incoming_transfers,
+        'qr_code_data_url': qr_code_data_url,
     })
 
 
@@ -523,3 +538,80 @@ def shift_cancel(request, shift_id):
     assignment.delete()
     messages.success(request, f'You have cancelled your signup for {shift}.')
     return redirect('shifts')
+
+
+@login_required
+def checkin(request):
+    """Check-in page for superusers to look up attendees by email."""
+    if not request.user.is_superuser:
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('home')
+
+    email = request.GET.get('email', '').strip().lower()
+    if email:
+        user = User.objects.filter(email=email).first()
+        if user:
+            return redirect('checkin_user', email=email)
+        else:
+            messages.error(request, 'No user found with that email address.')
+
+    return render(request, 'core/checkin.html')
+
+
+@login_required
+def checkin_user(request, email):
+    """Display check-in details for a specific user."""
+    if not request.user.is_superuser:
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('home')
+
+    user = get_object_or_404(User, email=email.lower())
+    event = Event.get_active()
+
+    base_tickets = Order.objects.filter(
+        ticket_type__event=event,
+        owning_user=user,
+        status='completed',
+    ).select_related('ticket_type') if event else Order.objects.none()
+
+    unclaimed_tickets = base_tickets.filter(claimed_at__isnull=True)
+    claimed_tickets = base_tickets.filter(claimed_at__isnull=False)
+
+    return render(request, 'core/checkin_user.html', {
+        'checkin_user': user,
+        'event': event,
+        'unclaimed_tickets': unclaimed_tickets,
+        'claimed_tickets': claimed_tickets,
+    })
+
+
+@login_required
+@require_POST
+def claim_tickets(request, email):
+    """Claim selected tickets for a user."""
+    if not request.user.is_superuser:
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('home')
+
+    user = get_object_or_404(User, email=email.lower())
+    ticket_ids = request.POST.getlist('ticket_ids')
+
+    if not ticket_ids:
+        messages.error(request, 'No tickets selected.')
+        return redirect('checkin_user', email=email)
+
+    event = Event.get_active()
+    updated = Order.objects.filter(
+        id__in=ticket_ids,
+        ticket_type__event=event,
+        owning_user=user,
+        status='completed',
+        claimed_at__isnull=True,
+    ).update(claimed_at=timezone.now())
+
+    if updated:
+        messages.success(request, f'{updated} ticket(s) claimed successfully.')
+    else:
+        messages.error(request, 'No tickets were claimed.')
+
+    return redirect('checkin_user', email=email)

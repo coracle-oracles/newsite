@@ -38,6 +38,18 @@
         </div>
         {% endif %}
 
+        {% if qr_code_data_url %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Your Ticket QR Code</h5>
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ qr_code_data_url }}" alt="Ticket QR Code" class="img-fluid" style="max-width: 200px;">
+                <p class="text-muted mt-2 small">Use this at gate to check-in</p>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="card mb-4">
             <div class="card-header">
                 <h5 class="mb-0">Your Tickets</h5>

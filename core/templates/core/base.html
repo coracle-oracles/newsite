@@ -87,6 +87,9 @@
                                 <ul class="dropdown-menu">
                                     <li><a class="dropdown-item" href="{% url 'my_tickets' %}">My Tickets</a></li>
                                     <li><a class="dropdown-item" href="{% url 'shifts' %}">Shifts</a></li>
+                                    {% if user.is_superuser %}
+                                    <li><a class="dropdown-item" href="{% url 'checkin' %}">Check-in</a></li>
+                                    {% endif %}
                                     <li>
                                         <form method="post" action="{% url 'logout' %}">
                                             {% csrf_token %}

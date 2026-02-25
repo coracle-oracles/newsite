@@ -1,0 +1,75 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Check-in: {{ checkin_user.email }} - Coracle{% endblock %}
+
+{% block head_content %}
+<h1>Check-in</h1>
+<span class="subheading">{{ checkin_user.email }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Attendee Details</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Name:</strong> {{ checkin_user.name }}</p>
+                <p><strong>Email:</strong> {{ checkin_user.email }}</p>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Unclaimed Tickets</h5>
+            </div>
+            <div class="card-body">
+                {% if unclaimed_tickets %}
+                <form method="post" action="{% url 'claim_tickets' checkin_user.email %}">
+                    {% csrf_token %}
+                    {% for order in unclaimed_tickets %}
+                    <div class="row align-items-center mb-3 pb-3 {% if not forloop.last %}border-bottom{% endif %}">
+                        <div class="col-auto">
+                            <input type="checkbox" name="ticket_ids" value="{{ order.id }}" class="form-check-input" id="ticket_{{ order.id }}">
+                        </div>
+                        <div class="col">
+                            <label for="ticket_{{ order.id }}" class="mb-0">
+                                <h6 class="mb-1">{{ order.ticket_type.label }}</h6>
+                                <p class="text-muted mb-0 small">Purchased: {{ order.created_at|date:"M d, Y" }}</p>
+                            </label>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    <button type="submit" class="btn btn-primary">Claim Selected Tickets</button>
+                </form>
+                {% else %}
+                    <p class="text-muted mb-0">No unclaimed tickets.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Claimed Tickets</h5>
+            </div>
+            <div class="card-body">
+                {% if claimed_tickets %}
+                    {% for order in claimed_tickets %}
+                    <div class="row align-items-center mb-3 pb-3 {% if not forloop.last %}border-bottom{% endif %}">
+                        <div class="col">
+                            <h6 class="mb-1">{{ order.ticket_type.label }}</h6>
+                            <p class="text-muted mb-0 small">Claimed: {{ order.claimed_at|date:"M d, Y g:i A" }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted mb-0">No claimed tickets.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <a href="{% url 'checkin' %}" class="btn btn-outline-secondary">Back to Check-in</a>
+    </div>
+</div>
+{% endblock %}
