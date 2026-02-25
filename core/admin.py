@@ -73,6 +73,7 @@ class RoleAdmin(admin.ModelAdmin):
     search_fields = ('name',)
     ordering = ('event', 'name')
     inlines = [ShiftInline]
+    filter_horizontal = ('leads',)
 
 
 class ShiftAssignmentInline(admin.TabularInline):
@@ -91,6 +92,48 @@ class ShiftAdmin(admin.ModelAdmin):
         return obj.spots_remaining
     spots_remaining.short_description = 'Spots Remaining'
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(role__leads=request.user)
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is not None:
+            return obj.role.leads.filter(pk=request.user.pk).exists()
+        return request.user.led_roles.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is not None:
+            return obj.role.leads.filter(pk=request.user.pk).exists()
+        return request.user.led_roles.exists()
+
+    def has_add_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return request.user.led_roles.exists()
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is not None:
+            return obj.role.leads.filter(pk=request.user.pk).exists()
+        return request.user.led_roles.exists()
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return request.user.led_roles.exists()
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'role' and not request.user.is_superuser:
+            kwargs['queryset'] = Role.objects.filter(leads=request.user)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
 
 @admin.register(ShiftAssignment)
 class ShiftAssignmentAdmin(admin.ModelAdmin):
@@ -98,3 +141,45 @@ class ShiftAssignmentAdmin(admin.ModelAdmin):
     list_filter = ('shift__role__event', 'shift__role')
     search_fields = ('user__email', 'user__name')
     ordering = ('shift__start_time',)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(shift__role__leads=request.user)
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is not None:
+            return obj.shift.role.leads.filter(pk=request.user.pk).exists()
+        return request.user.led_roles.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is not None:
+            return obj.shift.role.leads.filter(pk=request.user.pk).exists()
+        return request.user.led_roles.exists()
+
+    def has_add_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return request.user.led_roles.exists()
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is not None:
+            return obj.shift.role.leads.filter(pk=request.user.pk).exists()
+        return request.user.led_roles.exists()
+
+    def has_module_permission(self, request):
+        if request.user.is_superuser:
+            return True
+        return request.user.led_roles.exists()
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'shift' and not request.user.is_superuser:
+            kwargs['queryset'] = Shift.objects.filter(role__leads=request.user)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
