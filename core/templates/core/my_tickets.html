@@ -38,14 +38,19 @@
         </div>
         {% endif %}
 
-        {% if qr_code_data_url %}
+        {% if owned_tickets %}
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">Your Ticket QR Code</h5>
+                <h5 class="mb-0">Check-in</h5>
             </div>
             <div class="card-body text-center">
-                <img src="{{ qr_code_data_url }}" alt="Ticket QR Code" class="img-fluid" style="max-width: 200px;">
-                <p class="text-muted mt-2 small">Use this at gate to check-in</p>
+                {% if has_waiver %}
+                    <img src="{{ qr_code_data_url }}" alt="Ticket QR Code" class="img-fluid" style="max-width: 200px;">
+                    <p class="text-muted mt-2 small">Use this QR code at gate to check-in</p>
+                {% else %}
+                    <p class="mb-3">You must sign the waiver before you can check in at the event.</p>
+                    <a href="{% url 'waiver' %}" class="btn btn-primary">Sign Waiver</a>
+                {% endif %}
             </div>
         </div>
         {% endif %}

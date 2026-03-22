@@ -17,6 +17,14 @@
             <div class="card-body">
                 <p><strong>Name:</strong> {{ checkin_user.name }}</p>
                 <p><strong>Email:</strong> {{ checkin_user.email }}</p>
+                <p>
+                    <strong>Waiver:</strong>
+                    {% if has_waiver %}
+                        <span class="badge bg-success">Signed</span>
+                    {% else %}
+                        <span class="badge bg-warning text-dark">Not signed</span>
+                    {% endif %}
+                </p>
             </div>
         </div>
 
@@ -41,6 +49,14 @@
                         </div>
                     </div>
                     {% endfor %}
+                    {% if not has_waiver %}
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="waiver_signed" class="form-check-input" id="waiver_signed">
+                        <label for="waiver_signed" class="form-check-label">
+                            I confirm the participant has signed a paper waiver
+                        </label>
+                    </div>
+                    {% endif %}
                     <button type="submit" class="btn btn-primary">Claim Selected Tickets</button>
                 </form>
                 {% else %}

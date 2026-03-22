@@ -14,8 +14,8 @@ from django.views.decorators.http import require_POST
 
 from django.db.models import Count
 
-from .forms import CustomUserCreationForm
-from .models import Event, Order, Transfer, User, Role, Shift, ShiftAssignment
+from .forms import CustomUserCreationForm, WaiverForm
+from .models import Event, Order, Transfer, User, Role, Shift, ShiftAssignment, Waiver
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -201,9 +201,12 @@ def my_tickets(request):
         status='pending',
     ).select_related('order__ticket_type', 'from_user') if event else Transfer.objects.none()
 
-    # Generate QR code with user's email if they have tickets
+    # Check if user has signed waiver
+    has_waiver = Waiver.objects.filter(user=request.user, event=event).exists() if event else False
+
+    # Generate QR code only if user has tickets AND signed waiver
     qr_code_data_url = None
-    if owned_tickets.exists():
+    if owned_tickets.exists() and has_waiver:
         qr = qrcode.make(request.build_absolute_uri('/checkin?email=' + quote(request.user.email)))
         buffer = io.BytesIO()
         qr.save(buffer, format='PNG')
@@ -216,6 +219,7 @@ def my_tickets(request):
         'outgoing_transfers': outgoing_transfers,
         'incoming_transfers': incoming_transfers,
         'qr_code_data_url': qr_code_data_url,
+        'has_waiver': has_waiver,
     })
 
 
@@ -577,11 +581,14 @@ def checkin_user(request, email):
     unclaimed_tickets = base_tickets.filter(claimed_at__isnull=True)
     claimed_tickets = base_tickets.filter(claimed_at__isnull=False)
 
+    has_waiver = Waiver.objects.filter(user=user, event=event).exists() if event else False
+
     return render(request, 'core/checkin_user.html', {
         'checkin_user': user,
         'event': event,
         'unclaimed_tickets': unclaimed_tickets,
         'claimed_tickets': claimed_tickets,
+        'has_waiver': has_waiver,
     })
 
 
@@ -601,6 +608,14 @@ def claim_tickets(request, email):
         return redirect('checkin_user', email=email)
 
     event = Event.get_active()
+
+    # Check waiver requirement
+    has_waiver = Waiver.objects.filter(user=user, event=event).exists() if event else False
+    waiver_signed = request.POST.get('waiver_signed') == 'on'
+
+    if not has_waiver and not waiver_signed:
+        messages.error(request, 'Cannot check in without a signed waiver. Either have the user complete the waiver online or check the box confirming the waiver was signed.')
+        return redirect('checkin_user', email=email)
     updated = Order.objects.filter(
         id__in=ticket_ids,
         ticket_type__event=event,
@@ -615,3 +630,36 @@ def claim_tickets(request, email):
         messages.error(request, 'No tickets were claimed.')
 
     return redirect('checkin_user', email=email)
+
+
+@login_required
+def waiver(request):
+    """Display and handle waiver signing form."""
+    event = Event.get_active()
+    if not event:
+        messages.error(request, 'No active event.')
+        return redirect('home')
+
+    # Check if user already signed waiver for this event
+    existing_waiver = Waiver.objects.filter(user=request.user, event=event).first()
+    if existing_waiver:
+        messages.info(request, 'You have already signed the waiver for this event.')
+        return redirect('my_tickets')
+
+    if request.method == 'POST':
+        form = WaiverForm(request.POST)
+        if form.is_valid():
+            waiver_obj = form.save(commit=False)
+            waiver_obj.user = request.user
+            waiver_obj.event = event
+            waiver_obj.save()
+            messages.success(request, 'Waiver signed successfully.')
+            return redirect('my_tickets')
+    else:
+        # Pre-fill with user's name if available
+        form = WaiverForm(initial={'legal_name': request.user.name})
+
+    return render(request, 'core/waiver.html', {
+        'form': form,
+        'event': event,
+    })

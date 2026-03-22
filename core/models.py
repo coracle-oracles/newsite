@@ -176,3 +176,37 @@ class ShiftAssignment(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.shift}"
+
+
+class Waiver(models.Model):
+    user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='waivers')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='waivers')
+
+    # Participant information
+    legal_name = models.CharField(max_length=255)
+    address = models.CharField(max_length=255)
+    phone = models.CharField(max_length=50)
+
+    # Emergency contact
+    emergency_contact_name = models.CharField(max_length=255)
+    emergency_contact_relationship = models.CharField(max_length=100)
+    emergency_contact_phone = models.CharField(max_length=50)
+
+    # ID information
+    id_sovereignty = models.CharField(max_length=100)
+    id_number = models.CharField(max_length=100)
+
+    # Vehicle information
+    vehicle_description = models.CharField(max_length=255, blank=True)
+    vehicle_state = models.CharField(max_length=100, blank=True)
+    vehicle_tag = models.CharField(max_length=50, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [['user', 'event']]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Waiver - {self.user.email} - {self.event.name}"
