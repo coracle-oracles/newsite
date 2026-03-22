@@ -88,7 +88,6 @@ class Order(models.Model):
     purchasing_user = models.ForeignKey('User', on_delete=models.RESTRICT, related_name='purchased_orders')
     owning_user = models.ForeignKey('User', on_delete=models.RESTRICT, related_name='owned_orders')
 
-    stripe_checkout_session_id = models.CharField(max_length=255)
     stripe_payment_intent_id = models.CharField(max_length=255, blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     claimed_at = models.DateTimeField(null=True, blank=True)

@@ -22,7 +22,7 @@
             </div>
         </div>
 
-        <form method="post" action="{% url 'create_checkout_session' %}" id="ticket-form">
+        <form method="post" action="{% url 'checkout' %}" id="ticket-form">
             {% csrf_token %}
 
             <div class="card mb-4">

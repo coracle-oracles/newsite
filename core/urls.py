@@ -36,7 +36,8 @@ urlpatterns = [
 
     # Tickets
     path('tickets/', views.tickets, name='tickets'),
-    path('checkout/create-session/', views.create_checkout_session, name='create_checkout_session'),
+    path('checkout/', views.create_payment_intent, name='checkout'),
+    path('checkout/confirm/', views.confirm_payment, name='confirm_payment'),
     path('checkout/success/', views.checkout_success, name='checkout_success'),
     path('checkout/cancel/', views.checkout_cancel, name='checkout_cancel'),
 
