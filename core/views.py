@@ -17,7 +17,7 @@ from django.views.decorators.http import require_POST
 from django.db.models import Count
 
 from .forms import CustomUserCreationForm, WaiverForm
-from .models import Event, Order, Transfer, User, Role, Shift, ShiftAssignment, Waiver
+from .models import Event, Order, Transfer, User, Role, Shift, ShiftAssignment, Waiver, TicketGrant
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -62,8 +62,13 @@ def tickets(request):
             status__in=['completed', 'pending'],
         ).values_list('ticket_type_id').annotate(count=Count('id'))
     )
+    granted_ticket_ids = set(
+        TicketGrant.objects.filter(user=request.user).values_list('ticket_type_id', flat=True)
+    )
     ticket_data = []
     for ticket_type in event.ticket_types.all():
+        if ticket_type.is_restricted and ticket_type.id not in granted_ticket_ids:
+            continue
         existing = existing_counts.get(ticket_type.id, 0)
         ticket_data.append({
             'ticket_type': ticket_type,
@@ -99,6 +104,15 @@ def create_payment_intent(request):
     if not tickets_to_create:
         messages.error(request, 'Please select at least one ticket.')
         return redirect('tickets')
+
+    # Check for restricted ticket access
+    granted_ticket_ids = set(
+        TicketGrant.objects.filter(user=request.user).values_list('ticket_type_id', flat=True)
+    )
+    for ticket_type in tickets_to_create:
+        if ticket_type.is_restricted and ticket_type.id not in granted_ticket_ids:
+            messages.error(request, f'You do not have access to purchase {ticket_type.label}.')
+            return redirect('tickets')
 
     # Check ticket limits per user for this event
     existing_counts = dict(

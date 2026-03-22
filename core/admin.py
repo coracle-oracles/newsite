@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import Event, Order, Role, Shift, ShiftAssignment, TicketType, Transfer, User
+from .models import Event, Order, Role, Shift, ShiftAssignment, TicketGrant, TicketType, Transfer, User
 
 
 class TicketTypeInline(admin.TabularInline):
@@ -20,10 +20,24 @@ class EventAdmin(admin.ModelAdmin):
 
 @admin.register(TicketType)
 class TicketTypeAdmin(admin.ModelAdmin):
-    list_display = ('label', 'event', 'name', 'price', 'max_per_user')
-    list_filter = ('event',)
+    list_display = ('label', 'event', 'name', 'price', 'max_per_user', 'is_restricted')
+    list_filter = ('event', 'is_restricted')
     search_fields = ('label', 'name')
     ordering = ('event', 'name')
+
+
+@admin.register(TicketGrant)
+class TicketGrantAdmin(admin.ModelAdmin):
+    list_display = ('user', 'ticket_type', 'granted_by', 'created_at')
+    list_filter = ('ticket_type__event', 'ticket_type')
+    search_fields = ('user__email', 'user__name', 'ticket_type__label')
+    autocomplete_fields = ('user', 'ticket_type')
+    ordering = ('-created_at',)
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.granted_by = request.user
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(User)

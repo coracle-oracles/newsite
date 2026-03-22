@@ -65,6 +65,7 @@ class TicketType(models.Model):
     price = models.PositiveIntegerField(help_text='Price in cents')
     stripe_price_id = models.CharField(max_length=255)
     max_per_user = models.PositiveIntegerField(default=4)
+    is_restricted = models.BooleanField(default=False, help_text='Restricted tickets require a grant to purchase')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -75,6 +76,21 @@ class TicketType(models.Model):
 
     def __str__(self):
         return f"{self.label} ({self.event.name})"
+
+
+class TicketGrant(models.Model):
+    ticket_type = models.ForeignKey(TicketType, on_delete=models.CASCADE, related_name='grants')
+    user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='ticket_grants')
+    granted_by = models.ForeignKey('User', on_delete=models.SET_NULL, null=True, related_name='granted_tickets')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [['ticket_type', 'user']]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.email} - {self.ticket_type.label}"
 
 
 class Order(models.Model):
