@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import Event, Order, Role, Shift, ShiftAssignment, TicketGrant, TicketType, Transfer, User
+from .models import Event, Order, Role, Shift, ShiftAssignment, TicketGrant, TicketType, Transfer, User, Waiver
 
 
 class TicketTypeInline(admin.TabularInline):
@@ -197,3 +197,20 @@ class ShiftAssignmentAdmin(admin.ModelAdmin):
         if db_field.name == 'shift' and not request.user.is_superuser:
             kwargs['queryset'] = Shift.objects.filter(role__leads=request.user)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+@admin.register(Waiver)
+class WaiverAdmin(admin.ModelAdmin):
+    list_display = ('user', 'event', 'legal_name', 'phone', 'created_at')
+    list_filter = ('event',)
+    search_fields = ('user__email', 'user__name', 'legal_name', 'phone')
+    ordering = ('-created_at',)
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        (None, {'fields': ('user', 'event')}),
+        ('Personal Information', {'fields': ('legal_name', 'address', 'phone')}),
+        ('Emergency Contact', {'fields': ('emergency_contact_name', 'emergency_contact_relationship', 'emergency_contact_phone')}),
+        ('Identification', {'fields': ('id_sovereignty', 'id_number')}),
+        ('Vehicle Information', {'fields': ('vehicle_description', 'vehicle_state', 'vehicle_tag')}),
+        ('Timestamps', {'fields': ('created_at', 'updated_at')}),
+    )
