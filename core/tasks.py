@@ -18,7 +18,7 @@ RECONCILIATION_INTERVAL_MINUTES = 10
 @task
 def reconcile_pending_orders(max_age_minutes=60):
     """
-    Reconcile pending orders by checking their status with Stripe.
+    Reconcile pending orders by checking their PaymentIntent status with Stripe.
 
     Finds orders that are still pending after a grace period and verifies
     their payment status directly with Stripe's API.
@@ -28,36 +28,33 @@ def reconcile_pending_orders(max_age_minutes=60):
     cutoff = timezone.now() - timedelta(minutes=5)
     max_age = timezone.now() - timedelta(minutes=max_age_minutes)
 
-    # Get unique session IDs for pending orders
-    pending_sessions = Order.objects.filter(
+    pending_intents = Order.objects.filter(
         status='pending',
+        stripe_payment_intent_id__isnull=False,
         created_at__lt=cutoff,
         created_at__gt=max_age,
-    ).values_list('stripe_checkout_session_id', flat=True).distinct()
+    ).values_list('stripe_payment_intent_id', flat=True).distinct()
 
     reconciled = 0
-    for session_id in pending_sessions:
+    for payment_intent_id in pending_intents:
         try:
-            session = stripe.checkout.Session.retrieve(session_id)
+            payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
 
-            if session.payment_status == 'paid':
+            if payment_intent.status == 'succeeded':
                 updated = Order.objects.filter(
-                    stripe_checkout_session_id=session_id,
+                    stripe_payment_intent_id=payment_intent_id,
                     status='pending',
-                ).update(
-                    status='completed',
-                    stripe_payment_intent_id=session.payment_intent,
-                )
+                ).update(status='completed')
                 reconciled += updated
-                logger.info(f"Reconciled session {session_id} - marked {updated} orders as completed")
-            elif session.status == 'expired':
+                logger.info(f"Reconciled PaymentIntent {payment_intent_id} - marked {updated} orders as completed")
+            elif payment_intent.status in ('canceled', 'requires_payment_method'):
                 updated = Order.objects.filter(
-                    stripe_checkout_session_id=session_id,
+                    stripe_payment_intent_id=payment_intent_id,
                     status='pending',
                 ).update(status='cancelled')
-                logger.info(f"Reconciled session {session_id} - marked {updated} orders as cancelled (session expired)")
+                logger.info(f"Reconciled PaymentIntent {payment_intent_id} - marked {updated} orders as cancelled")
         except stripe.error.StripeError as e:
-            logger.warning(f"Failed to reconcile session {session_id}: {e}")
+            logger.warning(f"Failed to reconcile PaymentIntent {payment_intent_id}: {e}")
 
     logger.info(f"Reconciliation complete: {reconciled} orders updated")
 

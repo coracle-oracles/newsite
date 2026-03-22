@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 from urllib.parse import quote
 
 import qrcode
@@ -9,6 +10,7 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.conf import settings
+from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -76,27 +78,24 @@ def tickets(request):
 
 @login_required
 @require_POST
-def create_checkout_session(request):
-    """Create a Stripe Checkout session and redirect to it."""
+def create_payment_intent(request):
+    """Create a Stripe PaymentIntent and render the custom checkout page."""
     event = Event.get_active()
     if not event:
         messages.error(request, 'No active event. Ticket sales are currently closed.')
         return redirect('home')
 
-    line_items = []
     tickets_to_create = []
+    total_cents = 0
 
     for ticket_type in event.ticket_types.all():
         quantity = int(request.POST.get(f'quantity_{ticket_type.id}', 0))
         if quantity > 0:
-            line_items.append({
-                'price': ticket_type.stripe_price_id,
-                'quantity': quantity,
-            })
             for _ in range(quantity):
                 tickets_to_create.append(ticket_type)
+            total_cents += quantity * ticket_type.price
 
-    if not line_items:
+    if not tickets_to_create:
         messages.error(request, 'Please select at least one ticket.')
         return redirect('tickets')
 
@@ -125,14 +124,11 @@ def create_checkout_session(request):
             )
             return redirect('tickets')
 
-    # Create Stripe Checkout session
-    checkout_session = stripe.checkout.Session.create(
-        payment_method_types=['card'],
-        line_items=line_items,
-        mode='payment',
-        success_url=request.build_absolute_uri('/checkout/success/') + '?session_id={CHECKOUT_SESSION_ID}',
-        cancel_url=request.build_absolute_uri('/checkout/cancel/'),
-        customer_email=request.user.email,
+    # Create Stripe PaymentIntent
+    payment_intent = stripe.PaymentIntent.create(
+        amount=total_cents,
+        currency='usd',
+        automatic_payment_methods={'enabled': True},
         metadata={
             'user_id': request.user.id,
         },
@@ -144,28 +140,82 @@ def create_checkout_session(request):
             ticket_type=ticket_type,
             purchasing_user=request.user,
             owning_user=request.user,
-            stripe_checkout_session_id=checkout_session.id,
+            stripe_payment_intent_id=payment_intent.id,
             status='pending',
         )
 
-    return redirect(checkout_session.url)
+    # Build order summary for template
+    order_summary = []
+    for ticket_type_id, count in requested_counts.items():
+        ticket_type = next(tt for tt in event.ticket_types.all() if tt.id == ticket_type_id)
+        subtotal = (ticket_type.price * count) / 100
+        order_summary.append({
+            'label': ticket_type.label,
+            'quantity': count,
+            'subtotal': f'{subtotal:.2f}',
+        })
+
+    # Build absolute URLs for Stripe
+    success_url = request.build_absolute_uri(f'/checkout/success/?payment_intent={payment_intent.id}')
+
+    return render(request, 'core/checkout.html', {
+        'client_secret': payment_intent.client_secret,
+        'payment_intent_id': payment_intent.id,
+        'stripe_publishable_key': settings.STRIPE_PUBLISHABLE_KEY,
+        'order_summary': order_summary,
+        'total_display': f'{total_cents / 100:.2f}',
+        'success_url': success_url,
+    })
+
+
+@login_required
+@require_POST
+def confirm_payment(request):
+    """Handle payment confirmation callback from frontend."""
+    try:
+        data = json.loads(request.body)
+        payment_intent_id = data.get('payment_intent_id')
+
+        if not payment_intent_id:
+            return JsonResponse({'success': False, 'error': 'Missing payment intent ID'}, status=400)
+
+        # Verify PaymentIntent status with Stripe
+        payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+
+        if payment_intent.status == 'succeeded':
+            # Update orders to completed
+            Order.objects.filter(
+                stripe_payment_intent_id=payment_intent_id,
+                purchasing_user=request.user,
+                status='pending',
+            ).update(status='completed')
+
+            return JsonResponse({'success': True})
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': f'Payment not completed. Status: {payment_intent.status}'
+            })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    except stripe.error.StripeError as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
 @login_required
 def checkout_success(request):
     """Handle successful checkout."""
-    session_id = request.GET.get('session_id')
-    if session_id:
+    payment_intent_id = request.GET.get('payment_intent')
+    if payment_intent_id:
         try:
-            session = stripe.checkout.Session.retrieve(session_id)
-            if session.payment_status == 'paid':
+            payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+            if payment_intent.status == 'succeeded':
                 Order.objects.filter(
-                    stripe_checkout_session_id=session_id,
+                    stripe_payment_intent_id=payment_intent_id,
+                    purchasing_user=request.user,
                     status='pending',
-                ).update(
-                    status='completed',
-                    stripe_payment_intent_id=session.payment_intent,
-                )
+                ).update(status='completed')
         except Exception:
             pass
 
@@ -174,7 +224,22 @@ def checkout_success(request):
 
 @login_required
 def checkout_cancel(request):
-    """Handle cancelled checkout."""
+    """Handle cancelled checkout and clean up pending orders."""
+    payment_intent_id = request.GET.get('payment_intent_id')
+    if payment_intent_id:
+        # Cancel pending orders for this payment intent
+        Order.objects.filter(
+            stripe_payment_intent_id=payment_intent_id,
+            purchasing_user=request.user,
+            status='pending',
+        ).update(status='cancelled')
+
+        # Cancel the PaymentIntent with Stripe
+        try:
+            stripe.PaymentIntent.cancel(payment_intent_id)
+        except stripe.error.StripeError:
+            pass  # PaymentIntent may already be cancelled or in a non-cancellable state
+
     return render(request, 'core/checkout_cancel.html')
 
 

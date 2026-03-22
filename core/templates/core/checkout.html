@@ -1,0 +1,129 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Checkout - Coracle{% endblock %}
+
+{% block head_content %}
+<h1>Checkout</h1>
+<span class="subheading">Complete your purchase</span>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Order Summary</h5>
+            </div>
+            <div class="card-body">
+                {% for item in order_summary %}
+                <div class="d-flex justify-content-between mb-2">
+                    <span>{{ item.label }} x {{ item.quantity }}</span>
+                    <span>${{ item.subtotal }}</span>
+                </div>
+                {% endfor %}
+                <hr>
+                <div class="d-flex justify-content-between fw-bold">
+                    <span>Total</span>
+                    <span>${{ total_display }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Payment Details</h5>
+            </div>
+            <div class="card-body">
+                <form id="payment-form">
+                    <div id="payment-element" class="mb-3"></div>
+                    <div id="error-message" class="alert alert-danger d-none" role="alert"></div>
+                    <button type="submit" id="submit-btn" class="btn btn-primary btn-lg w-100">
+                        <span id="button-text">Pay ${{ total_display }}</span>
+                        <span id="spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="text-center">
+            <a href="{% url 'checkout_cancel' %}?payment_intent_id={{ payment_intent_id }}"
+               class="btn btn-link text-muted">Cancel and return to tickets</a>
+        </div>
+    </div>
+</div>
+
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+const stripe = Stripe('{{ stripe_publishable_key }}');
+const clientSecret = '{{ client_secret }}';
+const confirmUrl = '{% url "confirm_payment" %}';
+const successUrl = '{{ success_url }}';
+const csrfToken = '{{ csrf_token }}';
+
+const appearance = {
+    theme: 'stripe',
+    variables: {
+        colorPrimary: '#0085A1',
+    }
+};
+const elements = stripe.elements({ clientSecret, appearance });
+const paymentElement = elements.create('payment');
+paymentElement.mount('#payment-element');
+
+const form = document.getElementById('payment-form');
+const submitBtn = document.getElementById('submit-btn');
+const buttonText = document.getElementById('button-text');
+const spinner = document.getElementById('spinner');
+const errorDiv = document.getElementById('error-message');
+
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    hideError();
+
+    const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+            return_url: successUrl,
+        },
+        redirect: 'if_required'
+    });
+
+    if (error) {
+        showError(error.message);
+        setLoading(false);
+    } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+        const response = await fetch(confirmUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ payment_intent_id: paymentIntent.id })
+        });
+        const result = await response.json();
+        if (result.success) {
+            window.location.href = successUrl;
+        } else {
+            showError(result.error || 'Payment confirmation failed. Please contact support.');
+            setLoading(false);
+        }
+    }
+});
+
+function setLoading(isLoading) {
+    submitBtn.disabled = isLoading;
+    buttonText.classList.toggle('d-none', isLoading);
+    spinner.classList.toggle('d-none', !isLoading);
+}
+
+function showError(message) {
+    errorDiv.textContent = message;
+    errorDiv.classList.remove('d-none');
+}
+
+function hideError() {
+    errorDiv.classList.add('d-none');
+}
+</script>
+{% endblock %}
