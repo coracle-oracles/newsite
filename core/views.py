@@ -68,6 +68,7 @@ def tickets(request):
         ticket_data.append({
             'ticket_type': ticket_type,
             'remaining': max(0, ticket_type.max_per_user - existing),
+            'price_display': f'{ticket_type.price / 100:.2f}',
         })
     return render(request, 'core/tickets.html', {
         'event': event,

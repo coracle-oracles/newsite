@@ -37,7 +37,7 @@
                             <p class="text-muted mb-0 small">{{ item.ticket_type.description }}</p>
                         </div>
                         <div class="col-md-3 text-md-center">
-                            <span class="fw-bold">${% widthratio item.ticket_type.price 100 1 %}.00</span>
+                            <span class="fw-bold">${{ item.price_display }}</span>
                         </div>
                         <div class="col-md-3">
                             <input type="number" name="quantity_{{ item.ticket_type.id }}" id="qty_{{ item.ticket_type.id }}"
