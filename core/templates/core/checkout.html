@@ -1,4 +1,5 @@
 {% extends 'core/base.html' %}
+{% load static %}
 
 {% block title %}Checkout - Coracle{% endblock %}
 
@@ -28,6 +29,108 @@
                 </div>
             </div>
         </div>
+
+        {% if waiver_form %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Waiver, Release of Liability, Terms and Conditions</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <a href="{% static 'doc/waiver.pdf' %}" target="_blank" class="btn btn-outline-primary btn-sm">
+                        View Full Waiver (PDF)
+                    </a>
+                </div>
+                <div class="waiver-text mb-3" style="max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; padding: 1rem; background-color: #f8f9fa; font-size: 0.85rem;">
+                    <p><strong>By signing this Waiver and Release of Liability ("Waiver"), I acknowledge I have read the entire document and understand the Terms and Conditions contained therein as well as the legal rights I am giving up knowingly and voluntarily without duress or coercion.</strong></p>
+                    <p>I understand and agree that the Waiver is a prerequisite of my attendance at {{ event.name }}. As a condition of attending and participating, <strong>I KNOWINGLY AND VOLUNTARILY ACCEPT AND ASSUME ANY AND ALL RISKS OF PERSONAL INJURY, INCLUDING THE POSSIBILITY OF SERIOUS INJURY OR DEATH.</strong></p>
+                    <p>I agree to comply with any and all rules, regulations, terms, and conditions of the event, and understand that any violation may result in my immediate ejection without refund.</p>
+                    <p>Key terms include but are not limited to:</p>
+                    <ul>
+                        <li>I am able to provide for all of my personal needs or do so with the assistance of my companions</li>
+                        <li>I shall clean my campsite before departing (Leave No Trace)</li>
+                        <li>My vehicle must remain parked in the designated parking area</li>
+                        <li>My person, vehicle, and possessions may be subject to search</li>
+                        <li>Consumption, possession or distribution of illegal substances is prohibited</li>
+                        <li>Vending is strictly prohibited</li>
+                        <li>Firearms, ammunition, projectile weapons, fireworks or explosives are prohibited</li>
+                        <li>I consent to receive medical treatment in event of emergency</li>
+                        <li>I understand this is an interactive event with substantial risk</li>
+                        <li>Tickets and service fees are nonrefundable</li>
+                    </ul>
+                    <p><strong>ON BEHALF OF MYSELF, MY HEIRS, EXECUTORS, ADMINISTRATORS AND ASSIGNS, I DO HEREBY KNOWINGLY AND VOLUNTARILY ASSUME ALL RISK OF PROPERTY LOSS, INJURY OR DEATH AND WAIVE, RELEASE, DISCHARGE, AND OTHERWISE AGREE THAT I AM BARRED FROM BRINGING ANY CAUSE OF ACTION AGAINST THE EVENT, ITS OFFICERS, DIRECTORS, MEMBERS, EMPLOYEES, VOLUNTEERS, REPRESENTATIVES, OR AGENTS.</strong></p>
+                </div>
+
+                <div id="waiver-form">
+                    <h6 class="mb-3">Personal Information</h6>
+                    <div class="mb-3">
+                        <label for="id_legal_name" class="form-label">{{ waiver_form.legal_name.label }} *</label>
+                        {{ waiver_form.legal_name }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_address" class="form-label">{{ waiver_form.address.label }} *</label>
+                        {{ waiver_form.address }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_phone" class="form-label">{{ waiver_form.phone.label }} *</label>
+                        {{ waiver_form.phone }}
+                    </div>
+
+                    <h6 class="mb-3 mt-4">Emergency Contact</h6>
+                    <div class="mb-3">
+                        <label for="id_emergency_contact_name" class="form-label">{{ waiver_form.emergency_contact_name.label }} *</label>
+                        {{ waiver_form.emergency_contact_name }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_emergency_contact_relationship" class="form-label">{{ waiver_form.emergency_contact_relationship.label }} *</label>
+                        {{ waiver_form.emergency_contact_relationship }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_emergency_contact_phone" class="form-label">{{ waiver_form.emergency_contact_phone.label }} *</label>
+                        {{ waiver_form.emergency_contact_phone }}
+                    </div>
+
+                    <h6 class="mb-3 mt-4">Identification</h6>
+                    <div class="row align-items-end">
+                        <div class="col-md-6 mb-3">
+                            <label for="id_id_sovereignty" class="form-label">{{ waiver_form.id_sovereignty.label }} *</label>
+                            {{ waiver_form.id_sovereignty }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_id_number" class="form-label">{{ waiver_form.id_number.label }} *</label>
+                            {{ waiver_form.id_number }}
+                        </div>
+                    </div>
+
+                    <h6 class="mb-3 mt-4">Vehicle Information <span class="text-muted">(Optional)</span></h6>
+                    <div class="mb-3">
+                        <label for="id_vehicle_description" class="form-label">{{ waiver_form.vehicle_description.label }}</label>
+                        {{ waiver_form.vehicle_description }}
+                        <div class="form-text">e.g., Blue Honda Civic</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="id_vehicle_state" class="form-label">{{ waiver_form.vehicle_state.label }}</label>
+                            {{ waiver_form.vehicle_state }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_vehicle_tag" class="form-label">{{ waiver_form.vehicle_tag.label }}</label>
+                            {{ waiver_form.vehicle_tag }}
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <div class="form-check mb-3">
+                        {{ waiver_form.agree_to_terms }}
+                        <label for="id_agree_to_terms" class="form-check-label">
+                            {{ waiver_form.agree_to_terms.label }} *
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <div class="card mb-4">
             <div class="card-header">
@@ -59,6 +162,7 @@ const clientSecret = '{{ client_secret }}';
 const confirmUrl = '{% url "confirm_payment" %}';
 const successUrl = '{{ success_url }}';
 const csrfToken = '{{ csrf_token }}';
+const hasWaiverForm = {{ waiver_form|yesno:"true,false" }};
 
 const appearance = {
     theme: 'stripe',
@@ -76,10 +180,58 @@ const buttonText = document.getElementById('button-text');
 const spinner = document.getElementById('spinner');
 const errorDiv = document.getElementById('error-message');
 
+function getWaiverData() {
+    if (!hasWaiverForm) return null;
+
+    const waiverFields = [
+        'legal_name', 'address', 'phone',
+        'emergency_contact_name', 'emergency_contact_relationship', 'emergency_contact_phone',
+        'id_sovereignty', 'id_number',
+        'vehicle_description', 'vehicle_state', 'vehicle_tag'
+    ];
+    const data = {};
+    for (const field of waiverFields) {
+        const el = document.getElementById('id_' + field);
+        if (el) data[field] = el.value;
+    }
+    const agreeCheckbox = document.getElementById('id_agree_to_terms');
+    if (agreeCheckbox) data['agree_to_terms'] = agreeCheckbox.checked;
+    return data;
+}
+
+function validateWaiver() {
+    if (!hasWaiverForm) return true;
+
+    const requiredFields = [
+        'legal_name', 'address', 'phone',
+        'emergency_contact_name', 'emergency_contact_relationship', 'emergency_contact_phone',
+        'id_sovereignty', 'id_number'
+    ];
+    for (const field of requiredFields) {
+        const el = document.getElementById('id_' + field);
+        if (!el || !el.value.trim()) {
+            showError('Please fill in all required waiver fields.');
+            el?.focus();
+            return false;
+        }
+    }
+    const agreeCheckbox = document.getElementById('id_agree_to_terms');
+    if (!agreeCheckbox?.checked) {
+        showError('You must agree to the waiver terms and conditions.');
+        return false;
+    }
+    return true;
+}
+
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
     setLoading(true);
     hideError();
+
+    if (!validateWaiver()) {
+        setLoading(false);
+        return;
+    }
 
     const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
@@ -93,13 +245,17 @@ form.addEventListener('submit', async (e) => {
         showError(error.message);
         setLoading(false);
     } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+        const payload = { payment_intent_id: paymentIntent.id };
+        const waiverData = getWaiverData();
+        if (waiverData) payload.waiver_data = waiverData;
+
         const response = await fetch(confirmUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': csrfToken
             },
-            body: JSON.stringify({ payment_intent_id: paymentIntent.id })
+            body: JSON.stringify(payload)
         });
         const result = await response.json();
         if (result.success) {

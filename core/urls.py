@@ -53,9 +53,6 @@ urlpatterns = [
     path('shifts/signup/<int:shift_id>/', views.shift_signup, name='shift_signup'),
     path('shifts/cancel/<int:shift_id>/', views.shift_cancel, name='shift_cancel'),
 
-    # Waiver
-    path('waiver/', views.waiver, name='waiver'),
-
     # Check-in (superusers only)
     path('checkin', views.checkin, name='checkin'),
     path('checkin/<str:email>/', views.checkin_user, name='checkin_user'),

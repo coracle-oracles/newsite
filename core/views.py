@@ -158,6 +158,12 @@ def create_payment_intent(request):
     # Build absolute URLs for Stripe
     success_url = request.build_absolute_uri(f'/checkout/success/?payment_intent={payment_intent.id}')
 
+    # Check if user needs to sign waiver
+    has_waiver = Waiver.objects.filter(user=request.user, event=event).exists()
+    waiver_form = None
+    if not has_waiver:
+        waiver_form = WaiverForm(initial={'legal_name': request.user.name})
+
     return render(request, 'core/checkout.html', {
         'client_secret': payment_intent.client_secret,
         'payment_intent_id': payment_intent.id,
@@ -165,6 +171,8 @@ def create_payment_intent(request):
         'order_summary': order_summary,
         'total_display': f'{total_cents / 100:.2f}',
         'success_url': success_url,
+        'waiver_form': waiver_form,
+        'event': event,
     })
 
 
@@ -175,6 +183,7 @@ def confirm_payment(request):
     try:
         data = json.loads(request.body)
         payment_intent_id = data.get('payment_intent_id')
+        waiver_data = data.get('waiver_data')
 
         if not payment_intent_id:
             return JsonResponse({'success': False, 'error': 'Missing payment intent ID'}, status=400)
@@ -189,6 +198,17 @@ def confirm_payment(request):
                 purchasing_user=request.user,
                 status='pending',
             ).update(status='completed')
+
+            # Save waiver if provided and user hasn't signed yet
+            if waiver_data:
+                event = Event.get_active()
+                if event and not Waiver.objects.filter(user=request.user, event=event).exists():
+                    waiver_form = WaiverForm(waiver_data)
+                    if waiver_form.is_valid():
+                        waiver_obj = waiver_form.save(commit=False)
+                        waiver_obj.user = request.user
+                        waiver_obj.event = event
+                        waiver_obj.save()
 
             return JsonResponse({'success': True})
         else:
@@ -266,12 +286,9 @@ def my_tickets(request):
         status='pending',
     ).select_related('order__ticket_type', 'from_user') if event else Transfer.objects.none()
 
-    # Check if user has signed waiver
-    has_waiver = Waiver.objects.filter(user=request.user, event=event).exists() if event else False
-
-    # Generate QR code only if user has tickets AND signed waiver
+    # Generate QR code only if user has tickets
     qr_code_data_url = None
-    if owned_tickets.exists() and has_waiver:
+    if owned_tickets.exists():
         qr = qrcode.make(request.build_absolute_uri('/checkin?email=' + quote(request.user.email)))
         buffer = io.BytesIO()
         qr.save(buffer, format='PNG')
@@ -284,7 +301,6 @@ def my_tickets(request):
         'outgoing_transfers': outgoing_transfers,
         'incoming_transfers': incoming_transfers,
         'qr_code_data_url': qr_code_data_url,
-        'has_waiver': has_waiver,
     })
 
 
@@ -341,15 +357,19 @@ def transfer_ticket(request, order_id):
 
 
 @login_required
-@require_POST
 def accept_transfer(request, transfer_id):
-    """Accept an incoming transfer."""
+    """Accept an incoming transfer, with waiver form if needed."""
     transfer = get_object_or_404(
         Transfer,
         id=transfer_id,
         to_email=request.user.email,
         status='pending',
     )
+
+    event = Event.get_active()
+    if not event:
+        messages.error(request, 'No active event.')
+        return redirect('my_tickets')
 
     # Check ticket limits for this event
     existing_count = Order.objects.filter(
@@ -361,16 +381,46 @@ def accept_transfer(request, transfer_id):
         messages.error(request, 'You have reached your limit for this ticket type.')
         return redirect('my_tickets')
 
-    # Complete the transfer
-    transfer.order.owning_user = request.user
-    transfer.order.save()
+    # Check if user needs to sign waiver
+    has_waiver = Waiver.objects.filter(user=request.user, event=event).exists()
 
-    transfer.to_user = request.user
-    transfer.status = 'accepted'
-    transfer.save()
+    if request.method == 'POST':
+        # Process waiver form if user hasn't signed yet
+        if not has_waiver:
+            waiver_form = WaiverForm(request.POST)
+            if not waiver_form.is_valid():
+                return render(request, 'core/accept_transfer.html', {
+                    'transfer': transfer,
+                    'waiver_form': waiver_form,
+                    'event': event,
+                })
+            # Save the waiver
+            waiver_obj = waiver_form.save(commit=False)
+            waiver_obj.user = request.user
+            waiver_obj.event = event
+            waiver_obj.save()
 
-    messages.success(request, 'Transfer accepted. The ticket is now yours.')
-    return redirect('my_tickets')
+        # Complete the transfer
+        transfer.order.owning_user = request.user
+        transfer.order.save()
+
+        transfer.to_user = request.user
+        transfer.status = 'accepted'
+        transfer.save()
+
+        messages.success(request, 'Transfer accepted. The ticket is now yours.')
+        return redirect('my_tickets')
+
+    # GET request - show the accept page
+    waiver_form = None
+    if not has_waiver:
+        waiver_form = WaiverForm(initial={'legal_name': request.user.name})
+
+    return render(request, 'core/accept_transfer.html', {
+        'transfer': transfer,
+        'waiver_form': waiver_form,
+        'event': event,
+    })
 
 
 @login_required
@@ -695,36 +745,3 @@ def claim_tickets(request, email):
         messages.error(request, 'No tickets were claimed.')
 
     return redirect('checkin_user', email=email)
-
-
-@login_required
-def waiver(request):
-    """Display and handle waiver signing form."""
-    event = Event.get_active()
-    if not event:
-        messages.error(request, 'No active event.')
-        return redirect('home')
-
-    # Check if user already signed waiver for this event
-    existing_waiver = Waiver.objects.filter(user=request.user, event=event).first()
-    if existing_waiver:
-        messages.info(request, 'You have already signed the waiver for this event.')
-        return redirect('my_tickets')
-
-    if request.method == 'POST':
-        form = WaiverForm(request.POST)
-        if form.is_valid():
-            waiver_obj = form.save(commit=False)
-            waiver_obj.user = request.user
-            waiver_obj.event = event
-            waiver_obj.save()
-            messages.success(request, 'Waiver signed successfully.')
-            return redirect('my_tickets')
-    else:
-        # Pre-fill with user's name if available
-        form = WaiverForm(initial={'legal_name': request.user.name})
-
-    return render(request, 'core/waiver.html', {
-        'form': form,
-        'event': event,
-    })

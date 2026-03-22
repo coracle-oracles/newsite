@@ -23,10 +23,7 @@
                         <p class="text-muted mb-0 small">From: {{ transfer.from_user.name }} ({{ transfer.from_user.email }})</p>
                     </div>
                     <div class="col-md-6 text-md-end">
-                        <form method="post" action="{% url 'accept_transfer' transfer.id %}" class="d-inline">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-success btn-sm">Accept</button>
-                        </form>
+                        <a href="{% url 'accept_transfer' transfer.id %}" class="btn btn-success btn-sm">Accept</a>
                         <form method="post" action="{% url 'reject_transfer' transfer.id %}" class="d-inline">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-danger btn-sm">Reject</button>
@@ -44,13 +41,8 @@
                 <h5 class="mb-0">Check-in</h5>
             </div>
             <div class="card-body text-center">
-                {% if has_waiver %}
-                    <img src="{{ qr_code_data_url }}" alt="Ticket QR Code" class="img-fluid" style="max-width: 200px;">
-                    <p class="text-muted mt-2 small">Use this QR code at gate to check-in</p>
-                {% else %}
-                    <p class="mb-3">You must sign the waiver before you can check in at the event.</p>
-                    <a href="{% url 'waiver' %}" class="btn btn-primary">Sign Waiver</a>
-                {% endif %}
+                <img src="{{ qr_code_data_url }}" alt="Ticket QR Code" class="img-fluid" style="max-width: 200px;">
+                <p class="text-muted mt-2 small">Use this QR code at gate to check-in</p>
             </div>
         </div>
         {% endif %}
